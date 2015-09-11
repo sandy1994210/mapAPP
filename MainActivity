@@ -1,0 +1,517 @@
+package com.code.wantsafer;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+
+import android.content.res.Configuration;
+import android.support.v4.app.ActionBarDrawerToggle;
+import android.support.v4.view.GravityCompat;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v7.app.ActionBarActivity;
+import android.view.Gravity;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.ArrayAdapter;
+import android.widget.LinearLayout;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.ListView;
+import android.app.Activity;
+import android.content.Context;
+import android.graphics.Color;
+import android.location.GpsStatus;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.location.LocationProvider;
+import android.os.Bundle;
+import android.util.Log;
+import android.widget.Toast;
+
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
+
+
+	public class MainActivity extends ActionBarActivity{
+		private final String TAG = "=== Map Demo ==>";
+		
+		/**台北101*/
+		final LatLng TAIPEI101 = new LatLng(25.033611, 121.565000);
+		/**台北火車站*/
+		final LatLng TAIPEI_TRAIN_STATION = new LatLng(25.047924, 121.517081);
+		/**國立台灣博物館*/
+		final LatLng NATIONAL_TAIWAN_MUSEUM = new LatLng(25.042902, 121.515030);
+		
+		/** Map */
+		private GoogleMap mMap;
+//		private TextView txtOutput;
+		private Marker markerMe;
+
+		/** 記錄軌跡 */
+		private ArrayList<LatLng> traceOfMe;
+
+		/** GPS */
+		private LocationManager locationMgr;
+		private String provider;
+		
+		/**側邊欄*/
+		private DrawerLayout mDrawerLayout;
+	    private ActionBarDrawerToggle mDrawerToggle;
+
+	    private LinearLayout mLlvDrawerContent;
+	    private ListView mLsvDrawerMenu;
+	    // 記錄被選擇的選單指標用
+	    private int mCurrentMenuItemPosition = -1;
+	    // 選單項目
+	    public static final String[] MENU_ITEMS = new String[] { "資料選擇", "通知設定" };
+	    
+	    //private LinearLayout mLlvDrawerRight;
+	    DatabaseHelper myDb;
+	    
+		@Override
+		protected void onCreate(Bundle savedInstanceState) {
+			super.onCreate(savedInstanceState);
+			setContentView(R.layout.activity_main);
+			
+				
+			mDrawerLayout = (DrawerLayout) findViewById(R.id.drw_layout);
+	        // 設定 Drawer 的影子
+	        mDrawerLayout.setDrawerShadow(R.drawable.drawer_shadow,
+	                GravityCompat.START);
+
+	        mDrawerToggle = new ActionBarDrawerToggle(this, mDrawerLayout,    // 讓 Drawer Toggle 知道母體介面是誰
+	                R.drawable.ic_drawer,// Drawer 的 Icon
+	                R.string.open_left_drawer, // Drawer 被打開時的描述
+	                R.string.close_left_drawer // Drawer 被關閉時的描述
+	        ) {
+	            // 被打開後要做的事情
+	            @Override
+	            public void onDrawerOpened(View drawerView) {                
+	                // 將 Title 設定為自定義的文字
+	                if(mDrawerLayout.isDrawerOpen(Gravity.RIGHT)) { 
+	                    getSupportActionBar().setTitle(R.string.open_right_drawer);
+	                } else {
+	                    getSupportActionBar().setTitle(R.string.open_left_drawer);
+	                }
+	                
+	                if(mDrawerLayout.isDrawerOpen(Gravity.LEFT)) {
+	                    // 若是左側被打開，便將右側給鎖在關閉的狀態
+	                    mDrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED, Gravity.RIGHT);
+	                } else {
+	                    // 反之，便是將左側給鎖在關閉的狀態
+	                    mDrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED, Gravity.LEFT);
+	                }
+	            }
+
+	            // 被關上後要做的事情
+	            @Override
+	            public void onDrawerClosed(View drawerView) {
+	                if (mCurrentMenuItemPosition > -1) {
+	                    getSupportActionBar().setTitle(
+	                            MENU_ITEMS[mCurrentMenuItemPosition]);
+	                } else {
+	                    // 將 Title 設定回 APP 的名稱
+	                    getSupportActionBar().setTitle(R.string.app_name);
+	                }
+	                
+	                if(mDrawerLayout.isDrawerOpen(Gravity.LEFT)) {
+	                    // 解開左邊鎖定的狀態
+	                    mDrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, Gravity.LEFT);
+	                } else if(mDrawerLayout.isDrawerOpen(Gravity.RIGHT)) {
+	                    // 解開右邊鎖定的狀態
+	                    mDrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, Gravity.RIGHT);
+	                } else {
+	                    // 代表兩邊都被關上，以防萬一將兩邊的進行解鎖的動作
+	                    mDrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, Gravity.LEFT);
+	                   mDrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, Gravity.RIGHT);
+	                }
+	            }
+	        };
+	        
+	        mDrawerLayout.setDrawerListener(mDrawerToggle);
+	        // 顯示 Up Button (位在 Logo 左手邊的按鈕圖示)
+	        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+	        // 打開 Up Button 的點擊功能
+	        getSupportActionBar().setHomeButtonEnabled(true);
+
+	        setDrawerMenu();
+		}
+		
+	    /**設定側邊欄 - Drawer 的動作* */
+	    private void setDrawerMenu() {
+	        // 定義新宣告的兩個物件：選項清單的 ListView 以及 Drawer內容的 LinearLayou
+	        mLsvDrawerMenu = (ListView) findViewById(R.id.lsv_drawer_menu);
+	        mLlvDrawerContent = (LinearLayout) findViewById(R.id.llv_left_drawer);
+	        
+	        // 當清單選項的子物件被點擊時要做的動作
+	        mLsvDrawerMenu.setOnItemClickListener(new OnItemClickListener() {
+
+	            @Override
+	            public void onItemClick(AdapterView<?> parent, View view,
+	                    int position, long id) {
+	                selectMenuItem(position);
+	            }
+	        });
+	        // 設定清單的 Adapter，這裡直接使用 ArrayAdapter<String>
+	        mLsvDrawerMenu.setAdapter(new ArrayAdapter<String>(
+	                this,
+	                R.layout.drawer_menu_item,  // 選單物件的介面 
+	                MENU_ITEMS                  // 選單內容
+	        ));
+	    }
+
+	    /**
+	     * 設定當側邊欄裡的某個選項被點擊後要做的動作
+	     * */
+	    private void selectMenuItem(int position) {
+	        mCurrentMenuItemPosition = position;
+
+	        // 將選單的子物件設定為被選擇的狀態
+	        mLsvDrawerMenu.setItemChecked(position, true);
+
+	        // 關掉 Drawer
+	        mDrawerLayout.closeDrawer(mLlvDrawerContent);
+	    }
+
+	    @Override
+	    protected void onPostCreate(Bundle savedInstanceState) {
+	        super.onPostCreate(savedInstanceState);
+	        mDrawerToggle.syncState();
+	    }
+
+	    @Override
+	    public void onConfigurationChanged(Configuration newConfig) {
+	        super.onConfigurationChanged(newConfig);
+	        mDrawerToggle.onConfigurationChanged(newConfig);
+	    }
+
+	    @Override
+	    public boolean onOptionsItemSelected(MenuItem item) {
+	        if (mDrawerToggle.onOptionsItemSelected(item)) {
+	            // 判斷 DrawerLayout 裡的哪一個 Drawer 被打開
+	            if(mDrawerLayout.isDrawerOpen(Gravity.RIGHT)) {
+	                // 關掉 DrawerLayout 裡的某一個 Drawer
+	                mDrawerLayout.closeDrawer(Gravity.RIGHT);
+	            }
+	            return true;
+	        }
+
+	        return super.onOptionsItemSelected(item);
+	    }
+
+	    @Override
+	    public boolean onCreateOptionsMenu(Menu menu) {
+	        getMenuInflater().inflate(R.menu.main, menu);
+	        return true;
+	    }		
+				
+		
+		
+		
+		
+		@Override
+		protected void onStart() {
+			super.onStart();
+			
+	//		initView();
+			initMap();
+			if (initLocationProvider()) {
+				whereAmI();
+			}else{
+//				txtOutput.setText("請開啟定位！");
+			}
+		}
+
+
+		@Override
+		protected void onStop() {
+			locationMgr.removeUpdates(locationListener);
+			super.onStop();
+		}
+
+		@Override
+		protected void onResume() {
+			super.onResume();
+			initMap();
+//			drawPolyline();
+		}
+		
+/*		private void initView(){
+			txtOutput = (TextView) findViewById(R.id.txtOutput);
+		}*/
+
+		
+		/************************************************
+		 * 
+		 * 						Map部份
+		 * 
+		 ***********************************************/
+		/**
+		 * Map初始化
+		 * 建立3個標記
+		 */
+		private void initMap(){
+			if (mMap == null) {
+				mMap = ((MapFragment)getFragmentManager().findFragmentById(R.id.map)).getMap();
+				
+				if (mMap != null) {
+					//設定地圖類型
+					mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+					mMap.setMyLocationEnabled(true);
+					
+					//Marker1
+					MarkerOptions markerOpt = new MarkerOptions();
+					markerOpt.position(TAIPEI101);
+					markerOpt.title("台北101");
+					markerOpt.snippet("於1999年動工，2004年12月31日完工啟用，樓高509.2公尺。");
+					markerOpt.draggable(false);
+					markerOpt.visible(true);
+				//	markerOpt.anchor(0.5f, 0.5f);//設為圖片中心
+					markerOpt.icon(BitmapDescriptorFactory.fromResource(android.R.drawable.ic_menu_mylocation));				
+					mMap.addMarker(markerOpt);
+					
+					//Marker2
+					MarkerOptions markerOpt2 = new MarkerOptions();
+					markerOpt2.position(TAIPEI_TRAIN_STATION);
+					markerOpt2.title("台北火車站");				
+					mMap.addMarker(markerOpt2);
+					
+					//Marker3
+					MarkerOptions markerOpt3 = new MarkerOptions();
+					markerOpt3.position(NATIONAL_TAIWAN_MUSEUM);
+					markerOpt3.title("國立台灣博物館");
+					markerOpt3.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));					
+					mMap.addMarker(markerOpt3);
+				}
+			}
+			
+		}
+		/************************************************
+		 * 
+		 * 						GPS部份
+		 * 
+		 ***********************************************/
+		/**
+		 * GPS初始化，取得可用的位置提供器
+		 * @return
+		 */
+		private boolean initLocationProvider() {
+			locationMgr = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+			
+			
+			//2.選擇使用GPS提供器
+			if (locationMgr.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+				provider = LocationManager.GPS_PROVIDER;
+				return true;
+			}
+			
+	
+			
+			return false;
+		}
+		
+		/**
+		 * 執行"我"在哪裡
+		 * 1.建立位置改變偵聽器
+		 * 2.預先顯示上次的已知位置
+		 */
+		private void whereAmI(){
+//			String provider = LocationManager.GPS_PROVIDER;
+			
+			//取得上次已知的位置
+			Location location = locationMgr.getLastKnownLocation(provider);
+			updateWithNewLocation(location);
+			
+			//GPS Listener
+			locationMgr.addGpsStatusListener(gpsListener);
+			
+			
+			//Location Listener
+			long minTime = 5000;//ms
+			float minDist = 5.0f;//meter
+			locationMgr.requestLocationUpdates(provider, minTime, minDist, locationListener);
+		}
+		
+		/**
+		 * 顯示"我"在哪裡
+		 * @param lat
+		 * @param lng
+		 */
+		private void showMarkerMe(double lat, double lng){
+			if (markerMe != null) {
+				markerMe.remove();
+			}
+			
+			MarkerOptions markerOpt = new MarkerOptions();
+			markerOpt.position(new LatLng(lat, lng));
+			markerOpt.title("我在這裡");
+			markerMe = mMap.addMarker(markerOpt);
+			
+			Toast.makeText(this, "lat:" + lat + ",lng:" + lng, Toast.LENGTH_SHORT).show();
+		}
+		
+		private void cameraFocusOnMe(double lat, double lng){
+			CameraPosition camPosition = new CameraPosition.Builder()
+											.target(new LatLng(lat, lng))
+											.zoom(16)
+											.build();
+			
+			mMap.animateCamera(CameraUpdateFactory.newCameraPosition(camPosition));
+		}
+		
+		private void trackToMe(double lat, double lng){
+			if (traceOfMe == null) {
+				traceOfMe = new ArrayList<LatLng>();
+			}
+			traceOfMe.add(new LatLng(lat, lng));
+			
+			PolylineOptions polylineOpt = new PolylineOptions();
+			for (LatLng latlng : traceOfMe) {
+				polylineOpt.add(latlng);
+			}
+			
+			polylineOpt.color(Color.RED);
+			
+			Polyline line = mMap.addPolyline(polylineOpt);
+			line.setWidth(10);
+		}
+		
+		/**
+		 * 更新並顯示新位置
+		 * @param location
+		 */
+		private void updateWithNewLocation(Location location) {
+			String where = "";
+			if (location != null) {
+				//經度
+				double lng = location.getLongitude();
+				//緯度
+				double lat = location.getLatitude();
+				//速度
+				float speed = location.getSpeed();
+				//時間
+				long time = location.getTime();
+				String timeString = getTimeString(time);
+				
+				where = "經度: " + lng + 
+						"\n緯度: " + lat + 
+						"\n速度: " + speed + 
+						"\n時間: " + timeString +
+						"\nProvider: " + provider;
+				
+				//標記"我"
+				showMarkerMe(lat, lng);
+				cameraFocusOnMe(lat, lng);
+				trackToMe(lat, lng);
+				
+				//移動攝影機跟著"我"
+//				CameraPosition cameraPosition = new CameraPosition.Builder()
+//			    .target(new LatLng(lat, lng))      		// Sets the center of the map to ZINTUN
+//			    .zoom(13)                   // Sets the zoom
+//			    .bearing(90)                // Sets the orientation of the camera to east
+//			    .tilt(30)                   // Sets the tilt of the camera to 30 degrees
+//			    .build();                   // Creates a CameraPosition from the builder
+//				mMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+				
+//				CameraPosition camPosition = new CameraPosition.Builder()
+//												.target(new LatLng(lat, lng))
+//												.zoom(16)
+//												.build();
+	//
+//				mMap.animateCamera(CameraUpdateFactory.newCameraPosition(camPosition));
+				
+			}else{
+				where = "No location found.";
+			}
+			
+			//位置改變顯示
+//			txtOutput.setText(where);
+		}
+		
+		
+		GpsStatus.Listener gpsListener = new GpsStatus.Listener() {
+			
+			@Override
+			public void onGpsStatusChanged(int event) {
+				switch (event) {
+		        case GpsStatus.GPS_EVENT_STARTED:
+		        	Log.d(TAG, "GPS_EVENT_STARTED");
+		        	Toast.makeText(MainActivity.this, "GPS_EVENT_STARTED", Toast.LENGTH_SHORT).show();
+		            break;
+
+		        case GpsStatus.GPS_EVENT_STOPPED:
+		        	Log.d(TAG, "GPS_EVENT_STOPPED");
+		        	Toast.makeText(MainActivity.this, "GPS_EVENT_STOPPED", Toast.LENGTH_SHORT).show();
+		            break;
+
+		        case GpsStatus.GPS_EVENT_FIRST_FIX:
+		        	Log.d(TAG, "GPS_EVENT_FIRST_FIX");
+		        	Toast.makeText(MainActivity.this, "GPS_EVENT_FIRST_FIX", Toast.LENGTH_SHORT).show();
+		            break;
+
+		        case GpsStatus.GPS_EVENT_SATELLITE_STATUS:
+		        	Log.d(TAG, "GPS_EVENT_SATELLITE_STATUS");
+		            break;
+				}
+			}
+		};
+		
+		
+		LocationListener locationListener = new LocationListener(){
+
+			@Override
+			public void onLocationChanged(Location location) {
+				updateWithNewLocation(location);
+			}
+
+			@Override
+			public void onProviderDisabled(String provider) {
+				updateWithNewLocation(null);
+			}
+
+			@Override
+			public void onProviderEnabled(String provider) {
+				
+			}
+
+			@Override
+			public void onStatusChanged(String provider, int status, Bundle extras) {
+				switch (status) {
+			    case LocationProvider.OUT_OF_SERVICE:
+			        Log.v(TAG, "Status Changed: Out of Service");
+			        Toast.makeText(MainActivity.this, "Status Changed: Out of Service",
+			                Toast.LENGTH_SHORT).show();
+			        break;
+			    case LocationProvider.TEMPORARILY_UNAVAILABLE:
+			        Log.v(TAG, "Status Changed: Temporarily Unavailable");
+			        Toast.makeText(MainActivity.this, "Status Changed: Temporarily Unavailable",
+			                Toast.LENGTH_SHORT).show();
+			        break;
+			    case LocationProvider.AVAILABLE:
+			        Log.v(TAG, "Status Changed: Available");
+			        Toast.makeText(MainActivity.this, "Status Changed: Available",
+			                Toast.LENGTH_SHORT).show();
+			        break;
+			    }
+			}
+			
+		};
+		
+		private String getTimeString(long timeInMilliseconds){
+			SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+			return format.format(timeInMilliseconds);
+			
+		}
+		
+	}
