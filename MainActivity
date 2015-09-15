@@ -4,6 +4,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 
 import android.content.res.Configuration;
+import android.content.Intent;
 import android.support.v4.app.ActionBarDrawerToggle;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
@@ -15,10 +16,13 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.ListView;
+import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
@@ -27,6 +31,7 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.location.LocationProvider;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
@@ -34,6 +39,8 @@ import android.widget.Toast;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
+import com.google.android.gms.maps.MapView;
+import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
@@ -43,7 +50,9 @@ import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 
 
-	public class MainActivity extends ActionBarActivity{
+	@SuppressLint("NewApi")
+	@TargetApi(Build.VERSION_CODES.HONEYCOMB)
+	public class MainActivity extends ActionBarActivity {
 		private final String TAG = "=== Map Demo ==>";
 		
 		/**台北101*/
@@ -54,6 +63,7 @@ import com.google.android.gms.maps.model.PolylineOptions;
 		final LatLng NATIONAL_TAIWAN_MUSEUM = new LatLng(25.042902, 121.515030);
 		
 		/** Map */
+		private MapView mapView;
 		private GoogleMap mMap;
 //		private TextView txtOutput;
 		private Marker markerMe;
@@ -83,6 +93,20 @@ import com.google.android.gms.maps.model.PolylineOptions;
 		protected void onCreate(Bundle savedInstanceState) {
 			super.onCreate(savedInstanceState);
 			setContentView(R.layout.activity_main);
+			
+	
+			mapView = (MapView)findViewById(R.id.map_view);
+			mapView.setClickable(true);
+			
+			Button b1= (Button) findViewById(R.id.button1);
+			b1.setOnClickListener(new Button.OnClickListener( ){
+				public void onClick(View v){
+					Intent i=new Intent( );
+					i.setClass(MainActivity.this, AlarmActivity.class);
+					startActivity(i);
+				}
+			});
+		
 			
 				
 			mDrawerLayout = (DrawerLayout) findViewById(R.id.drw_layout);
@@ -327,7 +351,7 @@ import com.google.android.gms.maps.model.PolylineOptions;
 		 * 2.預先顯示上次的已知位置
 		 */
 		private void whereAmI(){
-//			String provider = LocationManager.GPS_PROVIDER;
+			String provider = LocationManager.GPS_PROVIDER;
 			
 			//取得上次已知的位置
 			Location location = locationMgr.getLastKnownLocation(provider);
